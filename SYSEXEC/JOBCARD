@@ -1,0 +1,13 @@
+/* REXX */                                                                      
+/* Insert JOBCARD to JCL in ISPF Edit */                                        
+"ISREDIT MACRO"                                                                 
+lineno = 0                                                                      
+line = "//IU***** JOB (FB3),'********',CLASS=A,MSGCLASS=H,"                     
+"ISREDIT LINE_AFTER "lineno" = (line)"                                          
+lineno = lineno + 1                                                             
+line = "//       NOTIFY=&SYSUID,REGION=0M,TIME=1440"                            
+"ISREDIT LINE_AFTER "lineno" = (line)"                                          
+lineno = lineno + 1                                                             
+line = "//*      TYPRUN=HOLD"                                                   
+"ISREDIT LINE_AFTER "lineno" = (line)"                                          
+Exit 0                                                                          

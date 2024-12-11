@@ -4,34 +4,12 @@ A collection of REXX scripts for z/OS system administration, cryptographic opera
 
 ## Table of Contents
 
-- [Script Overview](#script-overview)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
 - [Scripts](#scripts)
   - [GENECC](#genecc)
   - [GENLI2](#genli2)
   - [JOBCARD](#jobcard)
   - [SMSVJSON](#smsvjson)
   - [Z](#z)
-
-## Prerequisites
-
-- z/OS operating system
-- REXX support
-- ICSF access (for cryptographic operations)
-- SDSF access
-- ISPF access
-
-## Installation
-
-1. Upload scripts to your z/OS system
-2. Set appropriate file attributes:
-   ```
-   RECFM=FB
-   LRECL=80
-   DSORG=PS
-   ```
-3. Ensure execute permissions are set
 
 ## Scripts
 

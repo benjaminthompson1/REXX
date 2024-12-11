@@ -1,0 +1,31 @@
+/* REXX */                                                                      
+rc=isfcalls('ON')                                                               
+if rc<>0 then exit rc                                                           
+                                                                                
+Address SDSF "ISFEXEC SMSV"                                                     
+if rc<>0 then exit rc                                                           
+                                                                                
+say "{"                                                                         
+say ' "sms_volumes": ['                                                         
+                                                                                
+do ix=1 to isfrows                                                              
+  say "  {"                                                                     
+  say '   "volser": "'||strip(value('VOLSER.'ix))||'",'                         
+  say '   "status": "'||strip(value('STATUS.'ix))||'",'                         
+  say '   "total_mb": '||strip(value('TOTAL.'ix))||','                          
+  say '   "used_mb": '||strip(value('USED.'ix))||','                            
+  say '   "free_mb": '||strip(value('FREE.'ix))||','                            
+  say '   "usage_percent": '||strip(value('USEDPCT.'ix))||','                   
+  say '   "storage_group": "'||strip(value('STORGRP.'ix))||'",'                 
+  say '   "device_status": "'||strip(value('DEVSTAT.'ix))||'"'                  
+  if ix < isfrows then                                                          
+    say "  },"                                                                  
+  else                                                                          
+    say "  }"                                                                   
+end                                                                             
+                                                                                
+say " ]"                                                                        
+say "}"                                                                         
+                                                                                
+rc=isfcalls('OFF')                                                              
+exit                                                                            

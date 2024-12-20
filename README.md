@@ -90,8 +90,3 @@ Output format:
 
 ### Z
 Quick logoff utility.
-
-Usage:
-```
-TSO %Z
-```

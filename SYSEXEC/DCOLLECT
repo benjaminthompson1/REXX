@@ -1,0 +1,44 @@
+/* REXX */                                                                      
+/* Scan DCOLLECT 'D' records to report on compression */                        
+arg ds .                                                                        
+if ds = '' then do                                                              
+  say 'Usage: dcoll dcollect_output_dataset'                                    
+  return 8                                                                      
+end                                                                             
+                                                                                
+cmd = "ALLOC FI(INFILE) DA('"ds"') SHR"                                         
+src = bpxwdyn(cmd)                                                              
+if src \= 0 then do                                                             
+  say 'BPXWDYN RC=' src                                                         
+  return src                                                                    
+end                                                                             
+                                                                                
+n = 0                                                                           
+line.0 = 1                                                                      
+do while line.0 > 0                                                             
+  drop line.                                                                    
+  address mvs "EXECIO 1 DISKR INFILE (STEM line."                               
+  if line.0 > 0 then do                                                         
+    n = n + 1                                                                   
+    parse var line.1 5 rectyp 7 . 25 dsn 69 . 72 flag 73 . 386 ctype 387 .      
+    if rectyp = 'D ' then do                                                    
+      if bitand(flag, '04'x) = '04'x then do                                    
+        say dsn comptype(c2d(ctype))                                            
+      end                                                                       
+    end                                                                         
+  end                                                                           
+end                                                                             
+address mvs "EXECIO 0 DISKR INFILE (FINIS"                                      
+src = bpxwdyn("FREE FI(INFILE)")                                                
+                                                                                
+say n 'records read'                                                            
+                                                                                
+return                                                                          
+                                                                                
+comptype: procedure                                                             
+parse arg ctype                                                                 
+if ctype = 0 then return 'NOT COMPRESSED'                                       
+if ctype = 1 then return 'GENERIC'                                              
+if ctype = 2 then return 'TAILORED'                                             
+if ctype = 3 then return 'ZEDC'                                                 
+return '?unknown'                                                               

@@ -1,0 +1,34 @@
+/* REXX */                                                                      
+/*********************************************************************/         
+/* Program: GETDATE                                                  */         
+/* Purpose: Get current date in both Gregorian and Julian formats    */         
+/*********************************************************************/         
+                                                                                
+/* Initialize variables */                                                      
+current_date = DATE('S') /* Get current date in sortable format YYYYMMDD */     
+julian_date = DATE('J')  /* Get Julian date in format YYDDD */                  
+                                                                                
+/* Parse the current date */                                                    
+current_year = SUBSTR(current_date,1,4)    /* Extract year YYYY */              
+current_month = SUBSTR(current_date,5,2)   /* Extract month MM */               
+current_day = SUBSTR(current_date,7,2)     /* Extract day DD */                 
+                                                                                
+/* Parse Julian date */                                                         
+julian_year = SUBSTR(julian_date,1,2)      /* Extract year YY */                
+julian_days = SUBSTR(julian_date,3,3)      /* Extract days DDD */               
+                                                                                
+/* Format the output */                                                         
+SAY 'Current Date Information:'                                                 
+SAY '----------------------'                                                    
+SAY 'Gregorian Date:' current_day'/'current_month'/'current_year                
+SAY 'Julian Date:   ' julian_year'.'julian_days                                 
+                                                                                
+/* Additional date formats */                                                   
+SAY ''                                                                          
+SAY 'Additional Date Formats:'                                                  
+SAY '----------------------'                                                    
+SAY 'USA Format:    ' DATE('U')    /* Returns MM/DD/YYYY */                     
+SAY 'Standard:      ' DATE('S')    /* Returns YYYYMMDD */                       
+SAY 'Normal:        ' DATE('N')    /* Returns DD MMM YYYY */                    
+                                                                                
+EXIT 0                                                                          

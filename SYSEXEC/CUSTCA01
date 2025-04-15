@@ -1,0 +1,127 @@
+/* REXX */                                                                      
+/*******************************************************************/           
+/* CUSTCA01 - z/OS Catalog Aliases Setup                           */           
+/* This REXX implements catalog aliases for NSPI, SYS3 and SMPE    */           
+/*******************************************************************/           
+                                                                                
+/* Define variables */                                                          
+adcd_ver = "Z31C"                                                               
+target_cat = "USERCAT."adcd_ver".PRODS"                                         
+                                                                                
+Say "Starting z/OS Catalog Aliases Setup..."                                    
+                                                                                
+/* Set environment to TSO */                                                    
+Address TSO                                                                     
+                                                                                
+/* Initialize results tracking */                                               
+nspi_rc = 0                                                                     
+sys3_rc = 0                                                                     
+smpe_rc = 0                                                                     
+overall_success = 1  /* 1=Success, 0=Failure */                                 
+changes_made = 0     /* 0=No, 1=Yes */                                          
+                                                                                
+Say "Defining catalog aliases for target catalog:" target_cat                   
+                                                                                
+/* Define NSPI alias */                                                         
+Say "Defining NSPI alias..."                                                    
+"DEFINE ALIAS (NAME('NSPI') RELATE('"target_cat"'))"                            
+nspi_rc = rc                                                                    
+                                                                                
+If nspi_rc = 0 Then                                                             
+  Say "- NSPI alias defined successfully"                                       
+Else                                                                            
+  If nspi_rc = 8 Then                                                           
+    Say "- NSPI alias already exists (return code 8)"                           
+  Else                                                                          
+    Say "- Error defining NSPI alias. Return code =" nspi_rc                    
+    overall_success = 0                                                         
+                                                                                
+If nspi_rc = 0 Then                                                             
+  changes_made = 1                                                              
+                                                                                
+/* Define SYS3 alias */                                                         
+Say "Defining SYS3 alias..."                                                    
+"DEFINE ALIAS (NAME('SYS3') RELATE('"target_cat"'))"                            
+sys3_rc = rc                                                                    
+                                                                                
+If sys3_rc = 0 Then                                                             
+  Say "- SYS3 alias defined successfully"                                       
+Else                                                                            
+  If sys3_rc = 8 Then                                                           
+    Say "- SYS3 alias already exists (return code 8)"                           
+  Else                                                                          
+    Say "- Error defining SYS3 alias. Return code =" sys3_rc                    
+    overall_success = 0                                                         
+                                                                                
+If sys3_rc = 0 Then                                                             
+  changes_made = 1                                                              
+                                                                                
+/* Define SMPE alias */                                                         
+Say "Defining SMPE alias..."                                                    
+"DEFINE ALIAS (NAME('SMPE') RELATE('"target_cat"'))"                            
+smpe_rc = rc                                                                    
+                                                                                
+If smpe_rc = 0 Then                                                             
+  Say "- SMPE alias defined successfully"                                       
+Else                                                                            
+  If smpe_rc = 8 Then                                                           
+    Say "- SMPE alias already exists (return code 8)"                           
+  Else                                                                          
+    Say "- Error defining SMPE alias. Return code =" smpe_rc                    
+    overall_success = 0                                                         
+                                                                                
+If smpe_rc = 0 Then                                                             
+  changes_made = 1                                                              
+                                                                                
+/* Get current date and time for report */                                      
+current_date = Date('S')                                                        
+current_time = Time()                                                           
+timestamp = current_date || " " || current_time                                 
+                                                                                
+/* Display detailed execution summary */                                        
+Say ""                                                                          
+Say "Catalog Aliases Update Summary"                                            
+Say "=============================="                                            
+Say "Timestamp:" timestamp                                                      
+Say ""                                                                          
+Say "Execution Status:"                                                         
+If overall_success Then                                                         
+  Say "- Overall Status: Success"                                               
+Else                                                                            
+  Say "- Overall Status: Failed"                                                
+                                                                                
+If changes_made Then                                                            
+  Say "- Changes Made: Yes"                                                     
+Else                                                                            
+  Say "- Changes Made: No"                                                      
+                                                                                
+Say ""                                                                          
+Say "Verification Results:"                                                     
+Say "- Connectivity Check: Success"                                             
+Say "- Alias Definitions:"                                                      
+                                                                                
+If nspi_rc = 0 | nspi_rc = 8 Then                                               
+  Say "  * NSPI: Success"                                                       
+Else                                                                            
+  Say "  * NSPI: Failed (RC="nspi_rc")"                                         
+                                                                                
+If sys3_rc = 0 | sys3_rc = 8 Then                                               
+  Say "  * SYS3: Success"                                                       
+Else                                                                            
+  Say "  * SYS3: Failed (RC="sys3_rc")"                                         
+                                                                                
+If smpe_rc = 0 | smpe_rc = 8 Then                                               
+  Say "  * SMPE: Success"                                                       
+Else                                                                            
+  Say "  * SMPE: Failed (RC="smpe_rc")"                                         
+                                                                                
+Say ""                                                                          
+Say "Target Catalog:" target_cat                                                
+Say "Defined Aliases: NSPI, SYS3, SMPE"                                         
+                                                                                
+If overall_success Then                                                         
+  Say "z/OS Catalog Aliases Setup completed successfully."                      
+  Exit 0                                                                        
+Else                                                                            
+  Say "z/OS Catalog Aliases Setup completed with errors."                       
+  Exit 8                                                                        

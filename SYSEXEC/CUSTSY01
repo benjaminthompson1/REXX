@@ -1,0 +1,84 @@
+/* REXX */                                                                      
+/*********************************************************************/         
+/* CUSTSY01: REXX Member Copy Utility                                */         
+/* Program to copy members from IBMUSER.GIT.REXX.SYSEXEC to          */         
+/* USER.Z31C.SYSEXEC                                                 */         
+/*                                                                   */         
+/* This REXX program copies the following members:                   */         
+/*   - Z                                                             */         
+/*   - GETDATE                                                       */         
+/*   - JOBCARD                                                       */         
+/*********************************************************************/         
+                                                                                
+/* Define source and target datasets */                                         
+source_pds = "IBMUSER.GIT.REXX.SYSEXEC"                                         
+target_pds = "USER.Z31C.SYSEXEC"                                                
+                                                                                
+/* Define array of members to copy */                                           
+members.0 = 3                                                                   
+members.1 = "Z"                                                                 
+members.2 = "GETDATE"                                                           
+members.3 = "JOBCARD"                                                           
+                                                                                
+/* Set up default return code */                                                
+rc = 0                                                                          
+                                                                                
+say "Beginning copy of members from" source_pds "to" target_pds                 
+                                                                                
+/* Loop through each member and copy it */                                      
+do i = 1 to members.0                                                           
+  member = members.i                                                            
+  say "Copying member" member                                                   
+                                                                                
+  /* Create IEBCOPY control statements */                                       
+  queue "  COPY INDD=SYSUT1,OUTDD=SYSUT2"                                       
+  queue "  SELECT MEMBER=("member")"                                            
+                                                                                
+  /* Execute IEBCOPY using the QUEUE technique */                               
+  address TSO "ALLOC F(SYSUT1) DA('"source_pds"') SHR REUSE"                    
+  if rc <> 0 then do                                                            
+    say "Error allocating source dataset. RC =" rc                              
+    exit 8                                                                      
+  end                                                                           
+                                                                                
+  address TSO "ALLOC F(SYSUT2) DA('"target_pds"') SHR REUSE"                    
+  if rc <> 0 then do                                                            
+    say "Error allocating target dataset. RC =" rc                              
+    exit 8                                                                      
+  end                                                                           
+                                                                                
+  address TSO "ALLOC F(SYSIN) UNIT(VIO) NEW REUSE" ,                            
+              "RECFM(F B) LRECL(80) BLKSIZE(800)"                               
+  if rc <> 0 then do                                                            
+    say "Error allocating SYSIN. RC =" rc                                       
+    exit 8                                                                      
+  end                                                                           
+                                                                                
+  address TSO "ALLOC F(SYSPRINT) UNIT(VIO) NEW REUSE" ,                         
+              "RECFM(F B A) LRECL(121) BLKSIZE(1210)"                           
+  if rc <> 0 then do                                                            
+    say "Error allocating SYSPRINT. RC =" rc                                    
+    exit 8                                                                      
+  end                                                                           
+                                                                                
+  /* Push data from queue into SYSIN */                                         
+  "EXECIO" queued() "DISKW SYSIN (FINIS"                                        
+                                                                                
+  /* Run IEBCOPY */                                                             
+  address TSO "CALL *(IEBCOPY)"                                                 
+  copy_rc = rc                                                                  
+                                                                                
+  if copy_rc <> 0 then do                                                       
+    say "Error copying member" member". RC =" copy_rc                           
+    rc = max(rc, copy_rc)                                                       
+  end                                                                           
+  else do                                                                       
+    say "Successfully copied member" member                                     
+  end                                                                           
+                                                                                
+  /* Clean up allocated files */                                                
+  address TSO "FREE F(SYSUT1 SYSUT2 SYSIN SYSPRINT)"                            
+end                                                                             
+                                                                                
+say "Copy process complete with RC =" rc                                        
+exit rc                                                                         

@@ -1,0 +1,121 @@
+/* REXX */                                                                      
+/*********************************************************************/         
+/* CUSTCB01: COBOL Customization Setup                               */         
+/* Program to copy members from IGY640.SIGYPROC to USER.Z31C.PROCLIB */         
+/*                                                                   */         
+/* This REXX program copies the following members:                   */         
+/*   - IGYQC                                                         */         
+/*   - IGYQCB                                                        */         
+/*   - IGYQCBG                                                       */         
+/*                                                                   */         
+/* From IGY640.SIGYPROC to USER.Z31C.PROCLIB, updates LNGPRFX from   */         
+/* 'IGY.V6R4M0' to 'IGY640', and removes sequence numbers            */         
+/*********************************************************************/         
+                                                                                
+/* Initialize variables */                                                      
+src_pds = "IGY640.SIGYPROC"                                                     
+tgt_pds = "USER.Z31C.PROCLIB"                                                   
+members = "IGYQC IGYQCB IGYQCBG"                                                
+old_prefix = "LNGPRFX='IGY.V6R4M0'"                                             
+new_prefix = "LNGPRFX='IGY640'"                                                 
+                                                                                
+/* Display start message */                                                     
+say "CUSTCB01: COBOL Customization Setup"                                       
+say "Starting to copy members from" src_pds                                     
+say "To:" tgt_pds                                                               
+say "Note: Target PDS" tgt_pds "already exists"                                 
+say "Will update" old_prefix "to" new_prefix                                    
+say "Will remove sequence numbers"                                              
+                                                                                
+/* Process each member in the list */                                           
+do i = 1 to words(members)                                                      
+   member = word(members, i)                                                    
+                                                                                
+   /* Display progress */                                                       
+   say "Processing member:" member                                              
+                                                                                
+   /* Create a temporary dataset for the modified content */                    
+   temp_ds = "'"userid()".TEMP.PROC'"                                           
+   "DELETE" temp_ds "PURGE"                                                     
+   x = rc /* Ignore the return code as it might not exist */                    
+                                                                                
+   "ALLOCATE FILE(TEMPDS) DATASET("temp_ds") NEW CATALOG",                      
+            "SPACE(1,1) TRACKS RECFM(F B) LRECL(80) BLKSIZE(3120)"              
+   if rc <> 0 then do                                                           
+      say "Error allocating temporary dataset. RC=" rc                          
+      iterate                                                                   
+   end                                                                          
+                                                                                
+   /* Read the source member */                                                 
+   "ALLOCATE FILE(INDS) DATASET('"src_pds"("member")')",                        
+            "SHR REUSE"                                                         
+   if rc <> 0 then do                                                           
+      say "Error allocating source member. RC=" rc                              
+      "FREE FILE(TEMPDS)"                                                       
+      "DELETE" temp_ds "PURGE"                                                  
+      iterate                                                                   
+   end                                                                          
+                                                                                
+   /* Open the files and process line by line */                                
+   "EXECIO * DISKR INDS (STEM line. FINIS"                                      
+   "FREE FILE(INDS)"                                                            
+                                                                                
+   /* Process each line - first remove sequence numbers */                      
+   do j = 1 to line.0                                                           
+      /* If it's a JCL line (starts with //) */                                 
+      if left(strip(line.j),2) = '//' then do                                   
+         /* Remove any sequence numbers (usually in columns 73-80) */           
+         /* Keep only first 72 chars and trim trailing spaces */                
+         if length(line.j) > 72 then                                            
+            line.j = strip(left(line.j, 72), 'T')                               
+                                                                                
+         /* Now look for the specific LNGPRFX parameter to replace */           
+         if pos(old_prefix, line.j) > 0 then                                    
+            line.j = replace(line.j, old_prefix, new_prefix)                    
+      end                                                                       
+      /* For comment lines or other non-JCL lines */                            
+      else do                                                                   
+         /* Just remove any sequence numbers */                                 
+         if length(line.j) > 72 then                                            
+            line.j = strip(left(line.j, 72), 'T')                               
+      end                                                                       
+   end                                                                          
+                                                                                
+   /* Write the modified content to the temporary dataset */                    
+   "EXECIO" line.0 "DISKW TEMPDS (STEM line. FINIS"                             
+   "FREE FILE(TEMPDS)"                                                          
+                                                                                
+   /* Copy the modified member to the target PDS */                             
+   "ALLOCATE FILE(INDS) DATASET("temp_ds") SHR REUSE"                           
+   "ALLOCATE FILE(OUTDS) DATASET('"tgt_pds"("member")')",                       
+            "SHR REUSE"                                                         
+                                                                                
+   /* Perform the copy operation */                                             
+   "OCOPY INDD(INDS) OUTDD(OUTDS)"                                              
+   copy_rc = rc                                                                 
+                                                                                
+   /* Free the datasets */                                                      
+   "FREE FILE(INDS)"                                                            
+   "FREE FILE(OUTDS)"                                                           
+   "DELETE" temp_ds "PURGE"                                                     
+                                                                                
+   /* Check return code */                                                      
+   if copy_rc = 0 then                                                          
+      say "Successfully copied and updated member:" member                      
+   else                                                                         
+      say "Error copying member:" member", RC =" copy_rc                        
+end                                                                             
+                                                                                
+/* Display completion message */                                                
+say "Copy process completed with LNGPRFX updates"                               
+say "Sequence numbers have been removed"                                        
+                                                                                
+exit 0                                                                          
+                                                                                
+/* Function to replace text in a string */                                      
+replace: procedure                                                              
+   parse arg string, old, new                                                   
+   pos_start = pos(old, string)                                                 
+   if pos_start = 0 then return string                                          
+   return substr(string, 1, pos_start - 1) || new ||,                           
+          substr(string, pos_start + length(old))                               

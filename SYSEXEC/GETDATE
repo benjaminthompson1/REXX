@@ -1,34 +1,43 @@
 /* REXX */                                                                      
-/*********************************************************************/         
-/* Program: GETDATE                                                  */         
-/* Purpose: Get current date in both Gregorian and Julian formats    */         
-/*********************************************************************/         
+/*******************************************************************/           
+/* Display standard date and Julian day for a given date DDMMYYYY  */           
+/*******************************************************************/           
+/* Accept date in DDMMYYYY format or Julian day (YYDDD) */                      
+parse arg inputDate                                                             
+if inputDate = '' then                                                          
+  inputDate = date('S')  /* Use today's date if none provided */                
+else do                                                                         
+  /* Check if input is Julian day format (YYDDD) */                             
+  if length(inputDate) = 5 & datatype(inputDate, 'N') then do                   
+    /* Convert Julian day to standard format (YYYYMMDD) */                      
+    yy = substr(inputDate, 1, 2)                                                
+    ddd = substr(inputDate, 3, 3)                                               
                                                                                 
-/* Initialize variables */                                                      
-current_date = DATE('S') /* Get current date in sortable format YYYYMMDD */     
-julian_date = DATE('J')  /* Get Julian date in format YYDDD */                  
+    /* Determine century for two-digit year */                                  
+    if yy > 50 then                                                             
+      century = '19'                                                            
+    else                                                                        
+      century = '20'                                                            
                                                                                 
-/* Parse the current date */                                                    
-current_year = SUBSTR(current_date,1,4)    /* Extract year YYYY */              
-current_month = SUBSTR(current_date,5,2)   /* Extract month MM */               
-current_day = SUBSTR(current_date,7,2)     /* Extract day DD */                 
+    fullYear = century || yy                                                    
+    inputDate = date('S', inputDate, 'J')  /* Convert from Julian to Standard */
+    say 'Converted from Julian day: ' yy||ddd                                   
+  end                                                                           
+  else if length(inputDate) = 8 & datatype(inputDate, 'N') then do              
+    /* Convert DDMMYYYY to standard format (YYYYMMDD) */                        
+    day = substr(inputDate, 1, 2)                                               
+    month = substr(inputDate, 3, 2)                                             
+    year = substr(inputDate, 5, 4)                                              
+    inputDate = year || month || day                                            
+  end                                                                           
+  else do                                                                       
+    say 'Invalid input format. Please use DDMMYYYY or YYDDD (Julian).'          
+    exit 1                                                                      
+  end                                                                           
+end                                                                             
                                                                                 
-/* Parse Julian date */                                                         
-julian_year = SUBSTR(julian_date,1,2)      /* Extract year YY */                
-julian_days = SUBSTR(julian_date,3,3)      /* Extract days DDD */               
+julianDay = date('D', inputDate, 'S')  /* Get day of year */                    
+julianDay = right(julianDay, 3, '0')   /* Pad with zeros if needed */           
                                                                                 
-/* Format the output */                                                         
-SAY 'Current Date Information:'                                                 
-SAY '----------------------'                                                    
-SAY 'Gregorian Date:' current_day'/'current_month'/'current_year                
-SAY 'Julian Date:   ' julian_year'.'julian_days                                 
-                                                                                
-/* Additional date formats */                                                   
-SAY ''                                                                          
-SAY 'Additional Date Formats:'                                                  
-SAY '----------------------'                                                    
-SAY 'USA Format:    ' DATE('U')    /* Returns MM/DD/YYYY */                     
-SAY 'Standard:      ' DATE('S')    /* Returns YYYYMMDD */                       
-SAY 'Normal:        ' DATE('N')    /* Returns DD MMM YYYY */                    
-                                                                                
-EXIT 0                                                                          
+say 'Standard date: ' inputDate                                                 
+say 'Julian day:   ' julianDay                                                  

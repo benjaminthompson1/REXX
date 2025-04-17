@@ -1,0 +1,147 @@
+/* REXX */                                                                      
+/*********************************************************************/         
+/*                                                                   */         
+/* PURPOSE: CREATE ZFS DATASET AND MOUNTPOINT                        */         
+/*                                                                   */         
+/* NOTES: Change the following variables to suit your                */         
+/*        installation requirements                                  */         
+/*                                                                   */         
+/*********************************************************************/         
+                                                                                
+/* Define variables */                                                          
+zfsdsn = "SMPE.SMPNTS.ZFS"         /* Name of the ZFS dataset        */         
+volume = "C3USR4"                  /* Volume on which to create ZFS  */         
+mountpoint = "/u/smpe/smpnts"      /* Directory path for mounting    */         
+cylpri = 1                         /* Primary allocation in cylinders */        
+cylsec = 1                         /* Secondary allocation in cylinders */      
+dataclass = "DCEXTEAV"             /* Data class for the dataset     */         
+                                                                                
+Say "Creating ZFS dataset" zfsdsn                                               
+                                                                                
+/* Step 1: Create directory for mountpoint if it doesn't exist */               
+Say "Creating directory" mountpoint                                             
+                                                                                
+/* Using syscall to create directory with proper permissions */                 
+Address SYSCALL "mkdir /u/smpe 755"                                             
+dirrc1 = rc                                                                     
+If dirrc1 <> 0 & dirrc1 <> 17 Then  /* RC 17 means directory exists */          
+  Do                                                                            
+    Say "Error: Failed to create /u/smpe directory, RC=" dirrc1                 
+    Exit dirrc1                                                                 
+  End                                                                           
+                                                                                
+Address SYSCALL "mkdir /u/smpe/smpnts 755"                                      
+dirrc2 = rc                                                                     
+If dirrc2 <> 0 & dirrc2 <> 17 Then  /* RC 17 means directory exists */          
+  Do                                                                            
+    Say "Error: Failed to create" mountpoint "directory, RC=" dirrc2            
+    Exit dirrc2                                                                 
+  End                                                                           
+                                                                                
+Say "Directory" mountpoint "created or already exists"                          
+                                                                                
+/* Step 2: Define the ZFS cluster using IDCAMS */                               
+"ALLOC FI(SYSIN) NEW DELETE SPACE(1,1) TRACKS"                                  
+"ALLOC FI(SYSPRINT) NEW DELETE SPACE(1,1) TRACKS"                               
+                                                                                
+queue "  DEFINE -"                                                              
+queue "       CLUSTER -"                                                        
+queue "         ( -"                                                            
+queue "             NAME("zfsdsn") -"                                           
+queue "             LINEAR -"                                                   
+queue "             CYL("cylpri cylsec") VOLUME("volume") -"                    
+queue "             DATACLASS("dataclass") -"                                   
+queue "             SHAREOPTIONS(3) -"                                          
+queue "         )"                                                              
+                                                                                
+"EXECIO" queued() "DISKW SYSIN (FINIS"                                          
+                                                                                
+"CALL *(IDCAMS)"                                                                
+idcams_rc = rc                                                                  
+                                                                                
+"EXECIO * DISKR SYSPRINT (STEM IDCOUT. FINIS"                                   
+Do i = 1 to IDCOUT.0                                                            
+  Say IDCOUT.i                                                                  
+End                                                                             
+                                                                                
+If idcams_rc <> 0 Then                                                          
+  Do                                                                            
+    Say "Error: IDCAMS failed with RC=" idcams_rc                               
+    Exit idcams_rc                                                              
+  End                                                                           
+                                                                                
+Say "ZFS dataset created successfully."                                         
+                                                                                
+/* Step 3: Format the ZFS dataset using IOEAGFMT */                             
+Say "Formatting ZFS dataset" zfsdsn                                             
+                                                                                
+/* Allocate output files */                                                     
+"ALLOC FI(STDOUT) SYSOUT"                                                       
+"ALLOC FI(STDERR) SYSOUT"                                                       
+"ALLOC FI(SYSPRINT) SYSOUT"                                                     
+                                                                                
+/* Use BPXBATCH to run ioeagfmt command with proper parameters */               
+"ALLOC FI(STDENV) NEW REUSE UNIT(SYSDA) SPACE(1,1) TRACKS",                     
+       "LRECL(80) RECFM(F B) DSORG(PS)"                                         
+                                                                                
+queue "PATH=/bin:/usr/sbin:/usr/lpp/dfsms/bin"                                  
+"EXECIO 1 DISKW STDENV (FINIS"                                                  
+                                                                                
+/* Create a shell script to run the ioeagfmt command */                         
+"ALLOC FI(STDOUT) SYSOUT"                                                       
+"ALLOC FI(STDERR) SYSOUT"                                                       
+                                                                                
+cmd = "/usr/sbin/ioeagfmt -aggregate" zfsdsn "-compat"                          
+"CALL *(BPXBATCH) 'SH -c """ || cmd || """'"                                    
+format_rc = rc                                                                  
+                                                                                
+If format_rc <> 0 Then                                                          
+  Do                                                                            
+    Say "Error: IOEAGFMT failed with RC=" format_rc                             
+    Exit format_rc                                                              
+  End                                                                           
+                                                                                
+Say "ZFS dataset formatted successfully."                                       
+                                                                                
+"FREE FI(STDENV)"                                                               
+"FREE FI(STDOUT)"                                                               
+"FREE FI(STDERR)"                                                               
+                                                                                
+If format_rc <> 0 Then                                                          
+  Do                                                                            
+    Say "Error: IOEAGFMT failed with RC=" format_rc                             
+    Exit format_rc                                                              
+  End                                                                           
+                                                                                
+Say "ZFS dataset formatted successfully."                                       
+                                                                                
+/* Step 4: Mount the ZFS dataset */                                             
+"ALLOC FI(SYSTSIN) NEW DELETE SPACE(1,1) TRACKS"                                
+"ALLOC FI(SYSTSPRT) SYSOUT"                                                     
+                                                                                
+queue "PROFILE MSGID WTPMSG"                                                    
+queue "MOUNT TYPE(ZFS) +"                                                       
+queue "  MODE(RDWR) +"                                                          
+queue "  MOUNTPOINT('"mountpoint"') +"                                          
+queue "  FILESYSTEM('"zfsdsn"')"                                                
+                                                                                
+"EXECIO" queued() "DISKW SYSTSIN (FINIS"                                        
+                                                                                
+Say "Mounting ZFS dataset at" mountpoint                                        
+                                                                                
+"CALL *(IKJEFT01)"                                                              
+mount_rc = rc                                                                   
+                                                                                
+"EXECIO * DISKR SYSTSPRT (STEM MOUNTOUT. FINIS"                                 
+Do i = 1 to MOUNTOUT.0                                                          
+  Say MOUNTOUT.i                                                                
+End                                                                             
+                                                                                
+If mount_rc <> 0 Then                                                           
+  Do                                                                            
+    Say "Error: Mount command failed with RC=" mount_rc                         
+    Exit mount_rc                                                               
+  End                                                                           
+                                                                                
+Say "ZFS dataset mounted successfully at" mountpoint                            
+Exit 0                                                                          

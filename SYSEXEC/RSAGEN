@@ -1,0 +1,103 @@
+/* REXX */                                                                      
+/* generate a RSA key pair and store in PKDS */                                 
+bits = 2048                                                                     
+keylabel = 'BEN.RSA.KEY'                                                        
+                                                                                
+/* create a suitable skeleton token */                                          
+say 'Generating' bits'-bit RSA key pair'                                        
+return_code = d2c(0, 4)                                                         
+reason_code = d2c(0, 4)                                                         
+exit_data_length = d2c(0, 4)                                                    
+exit_data = ''                                                                  
+rule_array_count = d2c(1, 4)                                                    
+rule_array = 'RSA-AESM'                                                         
+key_value_structure_length = d2c(8, 4)                                          
+key_value_structure = d2c(bits, 2) || '000000000000'x                           
+private_key_name_length = d2c(0, 4)                                             
+private_key_name = ''                                                           
+user_definable_associated_data_length = d2c(0, 4)                               
+user_definable_associated_data = ''                                             
+key_derivation_data_length = d2c(0, 4)                                          
+key_derivation_data = ''                                                        
+reserved_3_length = d2c(0, 4)                                                   
+reserved_3 = ''                                                                 
+reserved_4_length = d2c(0, 4)                                                   
+reserved_4 = ''                                                                 
+reserved_5_length = d2c(0, 4)                                                   
+reserved_5 = ''                                                                 
+key_token_length = d2c(8000, 4)                                                 
+key_token = copies('00'x, 8000)                                                 
+                                                                                
+x = time('R')                                                                   
+address linkpgm 'CSNDPKB' ,                                                     
+  'return_code reason_code' ,                                                   
+  'exit_data_length exit_data' ,                                                
+  'rule_array_count rule_array' ,                                               
+  'key_value_structure_length key_value_structure' ,                            
+  'private_key_name_length private_key_name' ,                                  
+  'user_definable_associated_data_length' ,                                     
+  'user_definable_associated_data' ,                                            
+  'key_derivation_data_length key_derivation_data' ,                            
+  'reserved_3_length reserved_3' ,                                              
+  'reserved_4_length reserved_4' ,                                              
+  'reserved_5_length reserved_5' ,                                              
+  'key_token_length key_token'                                                  
+                                                                                
+rc = c2d(return_code)                                                           
+rsn = c2d(reason_code)                                                          
+say 'CSNDPKB rc='rc', rsn='rsn                                                  
+if rc > 4 then signal done                                                      
+                                                                                
+/* generate a key pair */                                                       
+return_code = d2c(0, 4)                                                         
+reason_code = d2c(0, 4)                                                         
+exit_data_length = d2c(0, 4)                                                    
+exit_data = ''                                                                  
+rule_array_count = d2c(1, 4)                                                    
+rule_array = 'MASTER  '                                                         
+regeneration_data_length = d2c(0, 4)                                            
+regeneration_data = ''                                                          
+skeleton_key_identifier_length = key_token_length                               
+skeleton_key_identifier = left(key_token, c2d(key_token_length))                
+transport_key_identifier = ''                                                   
+generated_key_token_length = d2c(8000, 4)                                       
+generated_key_token = copies('00'x, 8000)                                       
+                                                                                
+address linkpgm 'CSNDPKG' ,                                                     
+  'return_code reason_code' ,                                                   
+  'exit_data_length exit_data' ,                                                
+  'rule_array_count rule_array' ,                                               
+  'regeneration_data_length regeneration_data' ,                                
+  'skeleton_key_identifier_length skeleton_key_identifier' ,                    
+  'transport_key_identifier' ,                                                  
+  'generated_key_token_length generated_key_token'                              
+                                                                                
+rc = c2d(return_code)                                                           
+rsn = c2d(reason_code)                                                          
+say 'CSNDPKG rc='rc', rsn='rsn', elapsed='time('R') 'seconds'                   
+if rc > 4 then signal done                                                      
+                                                                                
+/* attempt to store the token in the PKDS */                                    
+return_code = d2c(0, 4)                                                         
+reason_code = d2c(0, 4)                                                         
+exit_data_length = d2c(0, 4)                                                    
+exit_data = ''                                                                  
+rule_array_count = d2c(0, 4)                                                    
+rule_array = ''                                                                 
+label = left(keylabel, 64)                                                      
+token_length = generated_key_token_length                                       
+token = left(generated_key_token, c2d(generated_key_token_length))              
+                                                                                
+address linkpgm 'CSNDKRC' ,                                                     
+  'return_code reason_code' ,                                                   
+  'exit_data_length exit_data' ,                                                
+  'rule_array_count rule_array' ,                                               
+  'label' ,                                                                     
+  'token_length token'                                                          
+                                                                                
+rc = c2d(return_code)                                                           
+rsn = c2d(reason_code)                                                          
+say 'CSNDPKG rc='rc', rsn='rsn                                                  
+if rc > 4 then signal done                                                      
+                                                                                
+done:                                                                           

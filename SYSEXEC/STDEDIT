@@ -1,0 +1,8 @@
+/* REXX */                                                                      
+ADDRESS ISREDIT                                                                 
+"MACRO"                                                                         
+"BOUNDS"                                                                        
+"TABS OFF"                                                                      
+"NULLS ON"                                                                      
+"HILITE AUTO"                                                                   
+"RECOVER ON"                                                                    

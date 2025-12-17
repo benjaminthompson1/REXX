@@ -1,0 +1,133 @@
+/* REXX */                                                                      
+/* list all datasets on a volume */                                             
+vol = ""                                                                        
+newvol = ""                                                                     
+arg vol newvol .                                                                
+if vol = '' | newvol = '' then ,                                                
+  exit xmsg('specify volume serial to change from/to', 12)                      
+                                                                                
+say "Changing volser" vol "to" newvol "..."                                     
+                                                                                
+cc=bpxwdyn('alloc dd(sysin) new delete reuse',                                  
+ 'lrecl(80) recfm(f,b) tracks space(1,1) unit(sysda)')                          
+if cc<>0 then exit xmsg('alloc sysin failed rc' cc)                             
+cc=bpxwdyn('alloc dd(sysprint) new delete reuse',                               
+ 'lrecl(121) recfm(f,b) tracks space(150,15) unit(sysda)')                      
+if cc<>0 then exit xmsg('alloc sysprint failed rc' cc)                          
+cc=bpxwdyn('alloc dd(disk) shr reuse',                                          
+ 'unit(sysda) vol('vol')')                                                      
+if cc<>0 then exit xmsg('alloc disk failed rc' cc)                              
+rec.0 = 1                                                                       
+rec.1 = ' LISTVTOC FORMAT,VOL=3390='vol                                         
+"EXECIO 1 DISKW SYSIN (STEM rec. FINIS"                                         
+                                                                                
+"CALL *(IEHLIST)"                                                               
+                                                                                
+"EXECIO * DISKR SYSPRINT (STEM lst. FINIS"                                      
+found = 0                                                                       
+nd = 0                                                                          
+do n=1 to lst.0                                                                 
+  if POS("----DATA SET NAME----", lst.n) > 0 then do                            
+    found = 1                                                                   
+  end                                                                           
+  else do                                                                       
+    if found then do                                                            
+      nd = nd + 1                                                               
+      parse var lst.n dsn.nd .                                                  
+      found = 0                                                                 
+    end                                                                         
+  end                                                                           
+end                                                                             
+cc=bpxwdyn('free dd(sysin)')                                                    
+cc=bpxwdyn('free dd(sysprint)')                                                 
+cc=bpxwdyn('free dd(disk)')                                                     
+say "Total data sets: "nd                                                       
+dsn.0 = nd                                                                      
+bad = 0                                                                         
+do n = 1 to nd                                                                  
+  /* check that volser matches old value and get cattle dog */                  
+  DROP idccmd.                                                                  
+  idccmd.0 = 3                                                                  
+  idccmd.1 = "  LISTCAT -"                                                      
+  idccmd.2 = "    ENTRIES("dsn.n") -"                                           
+  idccmd.3 = "    ALL NONVSAM"                                                  
+  call Idcams                                                                   
+  oldvol = ""                                                                   
+  cat = ""                                                                      
+  do i = 1 to idcprt.0                                                          
+    if POS("IN-CAT ---", idcprt.i) > 0 then do                                  
+      parse var idcprt.i . "IN-CAT --- "cat .                                   
+    end                                                                         
+    if POS("VOLSER------------", idcprt.i) > 0 then do                          
+      parse var idcprt.i . "VOLSER------------"oldvol .                         
+    end                                                                         
+  end                                                                           
+  if cat <> "" & oldvol = vol then do                                           
+    /* DELETE, DEFINE and LISTCAT */                                            
+    DROP idccmd.                                                                
+    idccmd.0 =  12                                                              
+    idccmd.1 =  "  DELETE -"                                                    
+    idccmd.2 =  "    "dsn.n" -"                                                 
+    idccmd.3 =  "    NOSCRATCH"                                                 
+    idccmd.4 =  "  DEFINE NONVSAM ( -"                                          
+    idccmd.5 =  "    NAME("dsn.n") -"                                           
+    idccmd.6 =  "    DEVICETYPES(0000) -"                                       
+    idccmd.7 =  "    VOLUMES("newvol") -"                                       
+    idccmd.8 =  "  ) -"                                                         
+    idccmd.9 =  "  CAT("cat")"                                                  
+    idccmd.10 = "  LISTCAT -"                                                   
+    idccmd.11 = "    ENTRIES("dsn.n") -"                                        
+    idccmd.12 = "    ALL NONVSAM"                                               
+    Call Idcams                                                                 
+    oldvol = ""                                                                 
+    cat = ""                                                                    
+    do i = 1 to idcprt.0                                                        
+      if POS("IN-CAT ---", idcprt.i) > 0 then do                                
+        parse var idcprt.i . "IN-CAT --- "cat .                                 
+      end                                                                       
+      if POS("VOLSER------------", idcprt.i) > 0 then do                        
+        parse var idcprt.i . "VOLSER------------"oldvol .                       
+      end                                                                       
+    end                                                                         
+    say "Now:" dsn.n "VOL("oldvol") CAT("cat")"                                 
+  end                                                                           
+  else do                                                                       
+    say dsn.n                                                                   
+    say "   Cat:>"cat"<"                                                        
+    say "   Vol:>"oldvol"<"                                                     
+    say "   *** Can't be recatalogued"                                          
+    bad = bad + 1                                                               
+    baddsn.bad = dsn.n                                                          
+    badcat.bad = cat                                                            
+    badvol.bad = oldvol                                                         
+  end                                                                           
+end                                                                             
+if bad > 0 then do                                                              
+  say "The following" bad "of" nd "data sets could not be recatalogued:"        
+  do i = 1 to bad                                                               
+    say baddsn.i "VOL("badvol.i") CAT("badcat.i")"                              
+  end                                                                           
+exit 0                                                                          
+                                                                                
+XMsg: if arg(1)<>'' then say arg(1);return word(arg(2) 0,1)                     
+                                                                                
+Idcams:                                                                         
+/* set stem variable idccmd. to commands to be executed */                      
+/* stem variable idcprt. contains results */                                    
+DROP idcprt.                                                                    
+idcprt.0 = 0                                                                    
+cc=bpxwdyn('alloc dd(sysin) new delete reuse',                                  
+ 'lrecl(80) recfm(f,b) tracks space(1,1) unit(sysda)')                          
+if cc<>0 then exit xmsg('alloc sysin failed rc' cc)                             
+cc=bpxwdyn('alloc dd(sysprint) new delete reuse',                               
+ 'lrecl(121) recfm(f,b) tracks space(150,15) unit(sysda)')                      
+if cc<>0 then exit xmsg('alloc sysprint failed rc' cc)                          
+                                                                                
+"EXECIO * DISKW SYSIN (STEM idccmd. FINIS"                                      
+                                                                                
+"CALL *(IDCAMS)"                                                                
+                                                                                
+"EXECIO * DISKR SYSPRINT (STEM idcprt. FINIS"                                   
+cc=bpxwdyn('free dd(sysin)')                                                    
+cc=bpxwdyn('free dd(sysprint)')                                                 
+return                                                                          

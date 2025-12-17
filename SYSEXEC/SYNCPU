@@ -1,31 +1,31 @@
-/* REXX  - SYNCPU: simple CPU burner              */
-/* Tune outer_loops and inner_loops to change load */
-
-parse arg outer_loops inner_loops
-
-if outer_loops = '' then outer_loops = 5000
-if inner_loops = '' then inner_loops = 50000
-
-say 'SYNCPU starting. OUTER='outer_loops ' INNER='inner_loops
-
-accum = 1
-str1  = copies('A',50)
-str2  = copies('B',50)
-
-start = time('E')
-
-do o = 1 to outer_loops
-  do i = 1 to inner_loops
-    accum = accum + 1
-    accum = accum * 3
-    accum = accum % 2          /* integer divide */
-    if accum = 0 then accum = 1
-    str2  = str1
-  end
-end
-
-elapsed = time('E') - start
-say 'SYNCPU finished. ACCUM='accum
-say 'Elapsed seconds='elapsed
-
-exit 0
+/* REXX  - SYNCPU: simple CPU burner              */                            
+/* Tune outer_loops and inner_loops to change load */                           
+                                                                                
+parse arg outer_loops inner_loops                                               
+                                                                                
+if outer_loops = '' then outer_loops = 5000                                     
+if inner_loops = '' then inner_loops = 50000                                    
+                                                                                
+say 'SYNCPU starting. OUTER='outer_loops ' INNER='inner_loops                   
+                                                                                
+accum = 1                                                                       
+str1  = copies('A',50)                                                          
+str2  = copies('B',50)                                                          
+                                                                                
+start = time('E')                                                               
+                                                                                
+do o = 1 to outer_loops                                                         
+  do i = 1 to inner_loops                                                       
+    accum = accum + 1                                                           
+    accum = accum * 3                                                           
+    accum = accum % 2          /* integer divide */                             
+    if accum = 0 then accum = 1                                                 
+    str2  = str1                                                                
+  end                                                                           
+end                                                                             
+                                                                                
+elapsed = time('E') - start                                                     
+say 'SYNCPU finished. ACCUM='accum                                              
+say 'Elapsed seconds='elapsed                                                   
+                                                                                
+exit                                                                            

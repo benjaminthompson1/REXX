@@ -1,0 +1,206 @@
+/* REXX */                                                                      
+/* Alter DDDEF entries in SMP/E zone to specify                                 
+   explicit VOLUME and UNIT to bypass catalog */                                
+args = ""                                                                       
+if ARG() > 0 then arg args                                                      
+if WORDS(args) < 3 then do                                                      
+  say "Parms: csi zone resvol1 [resvol2 ...]"                                   
+  return                                                                        
+end                                                                             
+parse upper var args csi zone .                                                 
+nv = WORDS(args) - 2                                                            
+do i = 1 to nv                                                                  
+  vol.i = WORD(args, i+2)                                                       
+end                                                                             
+say "CSI data set:" csi                                                         
+say "SMP/E zone:  " zone                                                        
+say "RESVOLs:"                                                                  
+do i = 1 to nv                                                                  
+  say "             " vol.i                                                     
+end                                                                             
+/* list DDDEFs in zone */                                                       
+DROP smpcmd.                                                                    
+smpcmd.0 = 2                                                                    
+smpcmd.1 = "  SET BOUNDARY("zone")."                                            
+smpcmd.2 = "  LIST DDDEF."                                                      
+call Smpe                                                                       
+ndd = 0                                                                         
+ignore = 1                                                                      
+do i = 1 to smpprt.0                                                            
+  if LENGTH(smpprt.i) > 12 & ,                                                  
+     SUBSTR(smpprt.i, 12, 1) <> " " & ,                                         
+     LEFT(smpprt.i, 11) = "           " & ,                                     
+     ndd > 0 & ignore = 0 then do                                               
+    attr = ""                                                                   
+    val = ""                                                                    
+    parse var smpprt.i attr "=" val .                                           
+    attr = STRIP(attr)                                                          
+    val = STRIP(val)                                                            
+    /* drop UNIT and VOLUME because we will replace them */                     
+    if attr <> "UNIT" & attr <> "VOLUME" & attr <> "" then do                   
+      if val <> "" then do                                                      
+        attrib.ndd = attrib.ndd attr"("val")"                                   
+      end                                                                       
+      else do                                                                   
+        attrib.ndd = attrib.ndd attr                                            
+      end                                                                       
+    end                                                                         
+    /* record if UNIT and VOLUME are already correct */                         
+    if attr = "UNIT" & val = "3390" then hasunit.ndd = 1                        
+    if attr = "VOLUME" then hasvol.ndd = val                                    
+  end                                                                           
+  else do                                                                       
+    if SUBSTR(smpprt.i, 12, 7) = "DATASET" then do                              
+      ndd = ndd + 1                                                             
+      parse var smpprt.i dddef.ndd "DATASET" "=" dsn.ndd .                      
+      dddef.ndd = STRIP(dddef.ndd)                                              
+      dsn.ndd = STRIP(dsn.ndd)                                                  
+      attrib.ndd = ""                                                           
+      hasunit.ndd = 0                                                           
+      hasvol.ndd = ""                                                           
+      indd = 1                                                                  
+      ignore = 0                                                                
+    end                                                                         
+    if SUBSTR(smpprt.i, 12, 7) = "CONCAT " | ,                                  
+       SUBSTR(smpprt.i, 12, 7) = "SYSOUT " | ,                                  
+       SUBSTR(smpprt.i, 12, 7) = "PATH   " | ,                                  
+       SUBSTR(smpprt.i, 12, 7) = "SPACE  " | ,                                  
+       SUBSTR(smpprt.i, 12, 7) = "SMPTLIB" then do                              
+      say "Ignoring" smpprt.i                                                   
+      ignore = 1                                                                
+    end                                                                         
+  end                                                                           
+end                                                                             
+say "Total DDDEFs in zone" zone "=" ndd                                         
+/* get data sets on RESVOLs */                                                  
+ndsn = 0                                                                        
+do i = 1 to nv                                                                  
+  lvvol = vol.i                                                                 
+  call Listvtoc                                                                 
+  do j = 1 to lvdsn.0                                                           
+    ndsn = ndsn + 1                                                             
+    rdsn.ndsn = lvdsn.j                                                         
+    rvol.ndsn = vol.i                                                           
+    founddd.ndsn = 0                                                            
+  end                                                                           
+end                                                                             
+say "Total datasets on RESVOLs =" ndsn                                          
+/* match RESVOL datasets against DDDEFs and modify DDDEF for any match */       
+do i = 1 to ndd                                                                 
+  found = 0                                                                     
+  j = 1                                                                         
+  do while found = 0 & j <= ndsn                                                
+    if dsn.i = rdsn.j then do                                                   
+      if hasunit.i = 1 & hasvol.i = rvol.j then do                              
+        say "Existing" dddef.i dsn.i attrib.i "UNIT(3390) VOLUME("rvol.j")"     
+      end                                                                       
+      else do                                                                   
+        say "Set" dddef.i "to" dsn.i attrib.i "UNIT(3390) VOLUME("rvol.j")"     
+        DROP smpcmd.                                                            
+        smpcmd.0 = 7                                                            
+        smpcmd.1 = "  SET BOUNDARY("zone")."                                    
+        smpcmd.2 = "  UCLIN."                                                   
+        smpcmd.3 = "    REP DDDEF("dddef.i")"                                   
+        smpcmd.4 = "        DATASET("dsn.i")"                                   
+        smpcmd.5 = "        "attrib.i                                           
+        smpcmd.6 = "        UNIT(3390) VOLUME("rvol.j")."                       
+        smpcmd.7 = "  ENDUCL."                                                  
+        call Smpe                                                               
+      end                                                                       
+      founddd.j = 1                                                             
+      found = 1                                                                 
+    end                                                                         
+    j = j + 1                                                                   
+  end                                                                           
+end                                                                             
+/* display RESVOL data sets for which no DDDEF exists in case */                
+/* the DDDEF is defined in another zone or CSI */                               
+say "*** RESVOL data sets with no DDDEF in zone" zone":"                        
+do i = 1 to ndsn                                                                
+  if founddd.i = 0 then do                                                      
+    say rdsn.i "VOLUME("rvol.i")"                                               
+  end                                                                           
+end                                                                             
+say "*** End of List ***"                                                       
+return                                                                          
+                                                                                
+                                                                                
+XMsg: if arg(1)<>'' then say arg(1);return word(arg(2) 0,1)                     
+                                                                                
+Smpe:                                                                           
+/* set stem variable smpcmd. to commands to be executed */                      
+/* stem variable smpprt. contains results */                                    
+DROP smpprt.                                                                    
+smpprt.0 = 0                                                                    
+cc=bpxwdyn('alloc dd(smpcntl) new delete reuse',                                
+ 'lrecl(80) recfm(f,b) tracks space(1,1) unit(sysda)')                          
+if cc<>0 then exit xmsg('alloc smpcntl failed rc' cc)                           
+cc=bpxwdyn('alloc dd(smpcsi) shr reuse dsn('csi')')                             
+if cc<>0 then exit xmsg('alloc smpcsi failed rc' cc)                            
+cc=bpxwdyn('alloc dd(smplist) new delete reuse',                                
+ 'lrecl(121) recfm(f,b) tracks space(150,15) unit(sysda)')                      
+if cc<>0 then exit xmsg('alloc smplist failed rc' cc)                           
+cc=bpxwdyn('alloc dd(smplog) new delete reuse',                                 
+ 'lrecl(121) recfm(f,b) tracks space(15,15) unit(sysda)')                       
+if cc<>0 then exit xmsg('alloc smplog failed rc' cc)                            
+cc=bpxwdyn('alloc dd(smpout) new delete reuse',                                 
+ 'lrecl(121) recfm(f,b) tracks space(15,15) unit(sysda)')                       
+if cc<>0 then exit xmsg('alloc smpout failed rc' cc)                            
+cc=bpxwdyn('alloc dd(smprpt) new delete reuse',                                 
+ 'lrecl(121) recfm(f,b) tracks space(15,15) unit(sysda)')                       
+if cc<>0 then exit xmsg('alloc smprpt failed rc' cc)                            
+                                                                                
+"EXECIO * DISKW SMPCNTL (STEM smpcmd. FINIS"                                    
+                                                                                
+"CALL *(GIMSMP)"                                                                
+                                                                                
+"EXECIO * DISKR SMPLIST (STEM smpprt. FINIS"                                    
+cc=bpxwdyn('free dd(smpcntl)')                                                  
+cc=bpxwdyn('free dd(smpcsi)')                                                   
+cc=bpxwdyn('free dd(smplist)')                                                  
+cc=bpxwdyn('free dd(smplog)')                                                   
+cc=bpxwdyn('free dd(smpout)')                                                   
+cc=bpxwdyn('free dd(smprpt)')                                                   
+return                                                                          
+                                                                                
+Listvtoc: procedure expose lvvol lvdsn.                                         
+/* set variable lvvol to volume to be listed */                                 
+/* stem variable lvdsn. contains results */                                     
+cc=bpxwdyn('alloc dd(sysin) new delete reuse',                                  
+ 'lrecl(80) recfm(f,b) tracks space(1,1) unit(sysda)')                          
+if cc<>0 then exit xmsg('alloc sysin failed rc' cc)                             
+cc=bpxwdyn('alloc dd(sysprint) new delete reuse',                               
+ 'lrecl(121) recfm(f,b) tracks space(150,15) unit(sysda)')                      
+if cc<>0 then exit xmsg('alloc sysprint failed rc' cc)                          
+cc=bpxwdyn('alloc dd(disk) shr reuse',                                          
+ 'unit(sysda) vol('lvvol')')                                                    
+if cc<>0 then exit xmsg('alloc disk failed rc' cc)                              
+rec.0 = 1                                                                       
+rec.1 = ' LISTVTOC FORMAT,VOL=3390='lvvol                                       
+"EXECIO 1 DISKW SYSIN (STEM rec. FINIS"                                         
+                                                                                
+"CALL *(IEHLIST)"                                                               
+                                                                                
+DROP lst.                                                                       
+"EXECIO * DISKR SYSPRINT (STEM lst. FINIS"                                      
+                                                                                
+found = 0                                                                       
+nd = 0                                                                          
+DROP lvdsn.                                                                     
+do n=1 to lst.0                                                                 
+  if POS("----DATA SET NAME----", lst.n) > 0 then do                            
+    found = 1                                                                   
+  end                                                                           
+  else do                                                                       
+    if found then do                                                            
+      nd = nd + 1                                                               
+      parse var lst.n lvdsn.nd .                                                
+      found = 0                                                                 
+    end                                                                         
+  end                                                                           
+end                                                                             
+cc=bpxwdyn('free dd(sysin)')                                                    
+cc=bpxwdyn('free dd(sysprint)')                                                 
+cc=bpxwdyn('free dd(disk)')                                                     
+lvdsn.0 = nd                                                                    
+return                                                                          

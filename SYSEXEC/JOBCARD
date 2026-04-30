@@ -1,13 +1,24 @@
-/* REXX */                                                                      
-/* Insert JOBCARD to JCL in ISPF Edit */                                        
-"ISREDIT MACRO"                                                                 
-lineno = 0                                                                      
-line = "//IU***** JOB (FB3),'********',CLASS=A,MSGCLASS=H,"                     
-"ISREDIT LINE_AFTER "lineno" = (line)"                                          
-lineno = lineno + 1                                                             
-line = "//       NOTIFY=&SYSUID,REGION=0M,TIME=1440"                            
-"ISREDIT LINE_AFTER "lineno" = (line)"                                          
-lineno = lineno + 1                                                             
-line = "//*      TYPRUN=HOLD"                                                   
-"ISREDIT LINE_AFTER "lineno" = (line)"                                          
-Exit 0                                                                          
+/* REXX */
+/* Insert JOBCARD to JCL in ISPF Edit */
+"ISREDIT MACRO"
+
+jobcard.0 = 3
+jobcard.1 = "//IU***** JOB (FB3),'********',CLASS=A,MSGCLASS=H,"
+jobcard.2 = "//       NOTIFY=&SYSUID,REGION=0M,TIME=1440"
+jobcard.3 = "//*      TYPRUN=HOLD"
+
+/* Insert in reverse so final order is correct */
+do i = jobcard.0 to 1 by -1
+    jline = jobcard.i
+    "ISREDIT LINE_AFTER 0 = (jline)"
+    if rc <> 0 then do
+        zedsmsg = "INSERT FAILED"
+        zedlmsg = "JOBCARD line "i" could not be inserted. RC="rc
+        "ISPEXEC SETMSG MSG(ISRZ001)"
+        exit 8
+    end
+end
+
+"ISREDIT CURSOR = 1"
+
+exit 0                                                                       
